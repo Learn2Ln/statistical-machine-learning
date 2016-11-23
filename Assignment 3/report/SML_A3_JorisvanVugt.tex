@@ -1,0 +1,39 @@
+\documentclass{article}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{fullpage}
+\usepackage{bm}
+\usepackage{amssymb}
+
+
+\author{Joris van Vugt, s4279859}
+\date{\today}
+\title{Statistical Machine Learning: Asssignment 3}
+
+\begin{document}
+\maketitle
+\section*{Exercise 1 -- Bayesian linear regression}
+\begin{enumerate}
+\item The predictive distrubtion after observing these two data points is
+$$ p(t| x, \bm{x}, \bm{t}) = \mathcal{N}(t|m(x), s^2(x)) $$.
+Using
+\begin{align*}
+\bm{S}_N^{-1} &= \begin{pmatrix}\alpha & 0 \\ 0 & \alpha\end{pmatrix} + N\beta\begin{pmatrix}1 & \bar{\mu}_x \\ \bar{\mu}_x & \bar{\mu}_{xx}\end{pmatrix} \\
+&= \begin{pmatrix}2 & 0 \\ 0 & 2\end{pmatrix} + 20\begin{pmatrix}1 & 0.5 \\ 0.5 & 0.26\end{pmatrix} \\
+&= \begin{pmatrix}22 & 10 \\ 10 & 7.2\end{pmatrix}
+\end{align*}
+we can compute the mean and standard deviation of the predictive distribution for each $x$
+\begin{align*}
+m(x) &= N\beta\begin{pmatrix}1 & x\end{pmatrix} \bm{S}_N\begin{pmatrix} \bar{\mu}_t \\ \bar{\mu}_{xt} \end{pmatrix} \\
+&= 2 \times 10\begin{pmatrix}1 & x\end{pmatrix}\begin{pmatrix}22 & 10 \\ 10 & 7.2\end{pmatrix}\begin{pmatrix}0.15 \\ -0.95\end{pmatrix} \\
+&= 20\begin{pmatrix}1 & x\end{pmatrix}\begin{pmatrix}22 & 10 \\ 10 & 7.2\end{pmatrix}\begin{pmatrix}0.15 \\ -0.95\end{pmatrix} 
+\end{align*}
+\begin{align*}
+s^2(x) &= \beta^{-1} + \begin{pmatrix}1 & x\end{pmatrix}\bm{S}_N\begin{pmatrix} 1 \\ x \end{pmatrix} \\
+&= 10^{-1} + \begin{pmatrix}1 & x\end{pmatrix}\begin{pmatrix}22 & 10 \\ 10 & 7.2\end{pmatrix}\begin{pmatrix} 1 \\ x \end{pmatrix}
+\end{align*}
+\end{enumerate}
+\end{document}
