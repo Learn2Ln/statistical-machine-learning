@@ -150,11 +150,15 @@ For $x^{(0)}=1$, the algorithm converges to the maximum in 3 steps. For $x^{(0)}
 \end{align*}
 From this, we can come up with the following Julia implementation
 \begin{lstlisting}
-for _ in 1:5
-    y = reshape(1. ./ (1+exp(-w' * phi)), N)
-    R = diagm(y .* (1-y))
-    z = phi' * w - inv(R) * (y - t)
-    w = inv(phi*R*phi') * phi * R * z
+function logistic_regression(phi, w, t, iterations=5)
+    N = length(t)
+    for _ in 1:iterations
+        y = reshape(1. ./ (1+exp(-w' * phi)), N)
+        R = diagm(y .* (1-y))
+        z = phi' * w - inv(R) * (y - t)
+        w = inv(phi*R*phi') * phi * R * z
+    end
+    w
 end
 \end{lstlisting}
 After 4 iterations, the weights are approximately $[9.8, -21.7]\approx\hat{\bm{w}}^T$.
@@ -172,7 +176,8 @@ p(C_1|\bm{\phi}) &= \frac{1}{1+e^{-\bm{w}^T\bm{\phi}}} \\
 \end{align*}
 \end{enumerate}
 \subsection*{Part 2 -- Two-class classification using logistic regression}
-We can generate a plot with the following code:
+\begin{enumerate}
+\item We can generate a plot with the following code:
 \begin{lstlisting}
 data = readdlm("a010_irlsdata.txt")
 X = data[:, 1:2]
@@ -188,4 +193,56 @@ scatter(X[C .== 1, 1], X[C .== 1, 2], c="r", label=L"$C=1$")
 \label{fig:scatter}
 \end{figure}
 I think logistic regression will have difficulties classifying this data. There is a large area where the both classes are represented equally. However, there are also some areas which strictly belong to a single class.
+\item Before optimization, the class probabilities are
+\begin{align*}
+p(C_1|\bm{\phi}) &= \frac{1}{1+e^{[0, 0, 0]^T\bm{\phi}}} \\
+&= \frac{1}{1+e^0} = \frac{1}{2}.
+\end{align*}
+I.e., both classes are equiprobable.
+\item 
+The cross-entropy before optimization is 693.15. After optimization, the cross entropy decreases only slightly to 692.97. Figure \ref{fig:scatter_probs} shows that the model is never certain of a class, as the probabilities are always around 0.5. Because only linear basis functions are used, the decision boundary is also linear. However, the data is not linearly seperable.
+\begin{lstlisting}
+function cross_entropy(y, t)
+    -sum(t.*log(y) + (1-t).*log(1-y))
+end
+\end{lstlisting}
+\begin{figure}[H]
+\centering
+\includegraphics[width=.8\textwidth]{images/scatter_probs.png}
+\caption{Class probabilities $P(C=1|X_n)$ after optimization.}
+\label{fig:scatter_probs}
+\end{figure}
+\item I think logistic regression will be a lot more succesful in this case. Both gaussians have the same covariance matrix, so the decision boundary will be linear. Both classes can be seperated fairly well in this case.
+\begin{figure}[H]
+\centering
+\includegraphics[width=.6\textwidth]{images/scatter_gauss.png}
+\caption{A scatter plot of the data in the feature domain using two Gaussian basis functions.}
+\label{fig:scatter_gauss}
+\end{figure}
+The following code was used to create the feature matrix
+\begin{lstlisting}
+sigma = diagm([0.2, 0.2])
+gauss_1 = MvNormal([0, 0], sigma)
+gauss_2 = MvNormal([1, 1], sigma)
+phi = zeros(3, N)
+for i in 1:N
+    phi[1, i] = 1
+    phi[2, i] = pdf(gauss_1, X[i, :])
+    phi[3, i] = pdf(gauss_2, X[i, :])
+end
+\end{lstlisting}
+\item After 5 iterations, the cross-entropy is 346.50. This approach works a lot better. Only the middle region still has a lot of uncertainty. All points in the outer edges are classified correctly. Figure \ref{fig:scatter_probs_features} shows that the model has indeed found a linear decision boundary in the feature domain.
+\begin{figure}[H]
+\centering
+\includegraphics[width=.6\textwidth]{images/scatter_probs_gauss.png}
+\caption{Class probabilities $P(C=1|X_n)$ after optimization using Gaussian basis functions.}
+\label{fig:scatter_probs_gauss}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=.6\textwidth]{images/scatter_probs_gauss_features.png}
+\caption{Class probabilities $P(C=1|X_n)$ in the feature domain after optimization using Gaussian basis functions.}
+\label{fig:scatter_probs_features}
+\end{figure}
+\end{enumerate}
 \end{document}
