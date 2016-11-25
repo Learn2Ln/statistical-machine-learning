@@ -111,8 +111,11 @@ function f(x, w)
     [1 x] * w
 end
 
+vs = linspace(0, 1, 100)
 m_N, S_N = p_w(x, t, alpha, beta)
+# Create the distribution to sample from
 weights_dist = MvNormal(m_N, S_N)
+# Sample 5 functions
 for _ in 1:5
     w = rand(weights_dist)
     y = [f(v, w) for v in vs]
@@ -142,7 +145,7 @@ function nr_sin(x)
     x + cos(x)/sin(x)
 end
 \end{lstlisting}
-For $x^{(0)}=1$, the algorithm converges to the maximum in 3 steps. For $x^{(0)}=-1$, the algorithm coverges to a minimum in 3 steps.
+For $x^{(0)}=1$, the algorithm converges to the maximum in 3 steps ($x=\frac{\pi}{2}, f(x)=1$). For $x^{(0)}=-1$, the algorithm coverges to a minimum in 3 steps ($x=-\frac{\pi}{2}, f(x)=-1$).
 \item The Newton-Raphson update rule for logistic regression is
 \begin{align*}
 \bm{w}^{\text{(new)}}&=(\bm{\Phi}^T\bm{R}\bm{\Phi})^{-1}\bm{\Phi}^T\bm{R}\textbf{z} \\
