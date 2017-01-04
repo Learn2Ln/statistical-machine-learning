@@ -1,0 +1,339 @@
+\documentclass[a4paper]{article}
+
+%% Must have
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{float}
+\usepackage{graphicx}
+
+%% Style
+\usepackage[english]{babel}
+\usepackage{multicol}
+\usepackage{cite}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs} % http://ctan.cs.uu.nl/macros/latex/contrib/booktabs/booktabs.pdf
+\usepackage{fancyhdr}
+\usepackage{cite}
+\usepackage[nottoc,numbib]{tocbibind} % number references
+\usepackage[a4paper]{geometry} % a4 margins
+\clubpenalty = 10000
+\widowpenalty = 10000 % Avoid dangling sentences
+\usepackage{subfig}   %\subfloat[][]{\includegraphics{...}\label{fig:1}}
+                      %\subfloat[][]{\includegraphics{...}\label{fig:2}} \caption{\subref{fig:1} blabla. \subref{fig:2} blabla.}
+                      % \caption{\subref{fig:1} blabla. \subref{fig:2} blabla.}
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+
+%% Math
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+
+
+%% Typography
+\usepackage{kpfonts}
+\usepackage{beramono}
+\usepackage{microtype} % load after font
+
+%% Listings
+\usepackage{listings}
+\lstset{%
+    language         = Python,
+    basicstyle       = \ttfamily\footnotesize,
+    keywordstyle     = \bfseries\color{blue},
+    stringstyle      = \color{magenta},
+    commentstyle     = \color{ForestGreen},
+    showstringspaces = false,
+    aboveskip={0.9\baselineskip},
+    belowskip={0.9\baselineskip},
+    columns=fixed,
+    extendedchars=true,
+    frame=lines,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Joris van Vugt}
+\lhead{Statistical Machine Learning (NWI054E)} % Project etc.
+\rfoot{\thepage}
+
+\author{Joris van Vugt, s4279859}
+\title{Statistical Machine Learning: Assignment 4} % Title
+\date{\today}
+
+\begin{document}
+\maketitle
+\section*{Exercise 1 -- Gaussian processes for regression}
+
+\pagebreak
+\section*{Exercise 2 -- Neural network regression} %%%%%%%%%%%%%%%%%%%%%%
+\begin{enumerate}
+\item The gaussian shown in Figure \ref{fig:mvg} is created with the following code
+\begin{lstlisting}
+X = np.mgrid[-2:2:.1, -2:2:.1]
+y = 3 * multivariate_normal(np.zeros((2,)), 0.4*np.eye(2)).pdf(X.T)
+
+fig = plt.figure(figsize=(10, 10), dpi=300)
+ax = fig.gca(projection='3d')
+col = ax.plot_surface(X[0], X[1], y, cmap=plt.cm.viridis, rstride=3, cstride=3)
+plt.xlabel('$x_1$')
+plt.ylabel('$x_2$')
+ax.set_zlabel('$p(x_1, x_2)$')
+plt.colorbar(col)
+plt.savefig('mvg.png', bbox_inches='tight', dpi=300)
+plt.show()
+\end{lstlisting}
+\begin{figure}
+\centering
+\includegraphics[width=.8\linewidth]{figures/mvg.png}
+\caption{An isotropic 2D gaussian given by $y = 3 \cdot \mathcal{N}(\bm{x}|\bm{0}, \frac{2}{5}\bm{I}_2)$}
+\label{fig:mvg}
+\end{figure}
+\item The following class implements the multi-layer perceptron described in the assignment. It is able to process an entire batch of data simultaneously. However, because of the sum-of-squares error function, the error quickly becomes very large, which is impractical for training.
+\begin{lstlisting}
+class MultiLayerPerceptron():
+    def __init__(self, D=2, K=1, M=2, learning_rate=0.1):
+        self.learning_rate = learning_rate
+        self.D, self.K, self.M = D, K, M
+        
+        
+        model = {}
+        model['W1'] = np.random.uniform(low=-0.5, high=0.5, size=(D, M))
+        model['b1'] = np.zeros(M)
+        model['W2'] = np.random.uniform(low=-0.5, high=0.5, size=(M, K))
+        model['b2'] = np.zeros(K)
+        self.model = model
+        
+    def forward(self, X):
+        """
+        X has shape [N x 2]
+        Returns the predictions for X [N, 1] and cached variables
+        for backprop
+        """
+        h_in = np.dot(X, self.model['W1']) + self.model['b1']
+        h = np.tanh(h_in)
+        y = np.dot(h, self.model['W2']) + self.model['b2']
+        return y, {'X': X, 'h': h, 'W2': self.model['W2']}
+    
+    def backward(self, dout, cache):
+        """
+        dout is the gradient on the loss function wrt to the predictions
+        cache is a dictionary of variables
+        """
+        grads = {}
+        grads['W2'] = np.dot(cache['h'].T, dout)
+        grads['b2'] = np.sum(dout, axis=0)
+        dh = np.dot(dout, cache['W2'].T)
+        dh_in = (1 - cache['h']**2) * dh # backprop through tanh
+        grads['W1'] = np.dot(cache['X'].T, dh_in)
+        grads['b1'] = np.sum(dh_in, axis=0)
+        return grads
+    
+    def loss(self, preds, y):
+        """
+        Computes the sum of squares error
+        """
+        difference = preds - y.reshape(-1, 1)
+        error = 0.5 * np.sum(difference**2)
+        return error, difference
+    
+    def train(self, X, y, iterations=500, verbose=True):
+        for i in range(iterations):
+            preds, cache = self.forward(X)
+            cost, dpreds = self.loss(preds, y)
+            grads = self.backward(dpreds, cache)
+            if verbose:
+                print('Iteration %d: loss=%.4f' % (i, cost))
+            for param in self.model.keys():
+                self.model[param] -= grads[param] * self.learning_rate
+\end{lstlisting}
+The initial weights yield the ``distribution'' shown in Figure \ref{fig:init_dist}. As to be expected, it doesn't look much like the original distribution yet.
+
+\begin{figure}
+\centering
+\includegraphics[width=.8\linewidth]{figures/initial_dist.png}
+\caption{The output of the MLP after random initialization (i.e., no training).}
+\label{fig:init_dist}
+\end{figure}
+
+\item After 200 iterations the output indeed starts to resemble a gaussian. However, the loss also shows that the minimal loss was also reached around that point. See Figure \ref{fig:mvg200}.
+
+\begin{figure}
+\centering
+\subfloat[The output of the network after 200 iterations.]{\includegraphics[width=.48\linewidth]{figures/mvg200.png}}
+\subfloat[The loss as a function of the number of iterations.]{\includegraphics[width=.48\linewidth]{figures/loss.png}}
+\caption{The training process of an MLP with $M=8$ and $\eta=0.1$.}
+\label{fig:mvg200}
+\end{figure}
+
+
+\item Randomly permuting $\bm{X}$ and $\bm{Y}$ drastically increases both the speed of convergence and the quality of the final model (see Figure \ref{fig:perm}. The final loss is $0.54$. The reason for this is that the model doesn't overfit as much to specific areas of the gaussian. If the data isn't permuted, the network will see a lot of similar samples sequentially. It will then overfit on this particular area and perform worse on other areas of the gaussian.
+
+Increasing the number of hidden units will further increase the loss (e.g., $M=40$ yields a loss of $0.07$). If the network has more hidden units, it will have more expressive power. The number of weights will also increase, so the weights take longer to converge.
+
+Decreasing the learning rate to $0.01$ increases the time it takes to converge. However, there is less noise in the loss over time and the final loss is lower ($1.03$). With a lower learning rate, gradient descent can make more subtle moves in the loss landscape. This leads to better optima.
+
+Different initial weights only slightly effect the final performce of the network.
+
+\begin{figure}
+\centering
+\subfloat[The final output of the network.]{\includegraphics[width=.48\linewidth]{figures/perm.png}}
+\subfloat[The loss as a function of the number of iterations.]{\includegraphics[width=.48\linewidth]{figures/perm_loss.png}}
+\caption{The training process of an MLP with $M=8$ and $\eta=0.1$ with the input randomly permuted.}
+\label{fig:perm}
+\end{figure}
+
+\item In Python, a little bit more work is required to plot the desired density (Figure \ref{fig:mm}).
+\begin{lstlisting}
+def plot_density(X, Y):
+    fig = plt.figure(figsize=(10, 10), dpi=300)
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(X[:, 0].reshape(41, 41), X[:, 1].reshape(41, 41), Y.reshape(41, 41), 
+                    cmap=plt.cm.viridis, rstride=1, cstride=1, linewidth=1)
+    plt.xlabel('$x_1$')
+    plt.ylabel('$x_2$')
+    ax.set_zlabel('$p(x_1, x_2)$')
+    ax.view_init(30, 230)
+    plt.show()
+\end{lstlisting}
+
+\begin{figure}
+\centering
+\subfloat[The multi-modal probability density to be modelled in the second part of the second exercise.]{\includegraphics[width=.48\linewidth]{figures/mm.png}}
+\subfloat[The output of the network after 2000 epochs with $M=40$ and $\eta=0.01$]{\includegraphics[width=.48\linewidth]{figures/mm_final.png}}
+\caption{The original distribution and the distribution learned by an MLP.}
+\label{fig:mm}
+\end{figure}
+
+\item The output from the network is quite similar to the original distribution. The major missing feature is the \emph{``peak''} in the original distribution. This peak is probably not smooth enough for the network to represent.
+
+The network may converge faster if the root mean squared error is used instead of simply the sum of squares. The loss will be less noisy, because it is averaged over multiple training examples. To increase the performance, it may be beneficial to use a deeper, but more narrow network. I.e., increase the number of layers, but decrease the number of units per layer. This will increase the expressive power of the network. Lastly, the performance of the network can be increased by using more data. In this case, this can simply be achieved by increasing the number of samples taken from the original distribution.
+\end{enumerate}
+
+
+\pagebreak
+\section*{Exercise 3 -- EM and doping} %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{enumerate}
+\item 
+Using the following code snippet we get the plot shown in Figure \ref{fig:expl}.
+\begin{lstlisting}
+X = np.loadtxt('a011_mixdata.txt')
+df = pd.DataFrame(X, columns=[1, 2, 3, 4])
+sns.pairplot(df)
+\end{lstlisting}
+ $x_1$, $x_2$ and $x_3$ seem to all be somewhat correlated. $x_4$ seems mostly uncorrelated with the other variables for the most part. It is hard to spot any meaningful structure with the naked eye. Figure \ref{fig:scatter} is more promissing. It is possible to make out some points that show signs of doping.
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{figures/EM_expl.png}
+\caption{Scatter plots of all combinations of variables. On the diagonal a histogram of that single variable is shown.}
+\label{fig:expl}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=.8\linewidth]{figures/scatter.png}
+\caption{Scatter plot of $x_1$ and $x_2$. The points are coloured according to $x_3 + x_4$. The red ellipses indicate points which are positively correlated between $x_1$ and $x_2$, and also show some structure in $x_3 + x_4$. These could be possible cases of doping. Other simple combinations of $x_3$ and $x_4$ did not show interactions like here.}
+\label{fig:scatter}
+\end{figure}
+\item 
+The code closely follows the summarization in Bishop \S9.2.2. The E step consists of evaluation the responsibilities
+\begin{equation}
+\gamma(z_{nk}) = \frac{\pi_k\mathcal{N}(\bm{x}_n|\bm{\mu}_k,\bm{\Sigma}_k)}{\sum_{j=1}^K\pi_j\mathcal{N}(\bm{x}_n|\bm{\mu}_j,\bm{\Sigma}_j)}.
+\end{equation}
+In the M step, the parameters are re-estimated
+\begin{align}
+N_k &= \sum_{n=1}^N\gamma(z_{nk}) \\
+\bm{\mu}_k^{\text{new}}&=\frac{1}{N_k}\sum_{n=1}^N\gamma(z_{nk})\bm{x}_n\\
+\bm{\Sigma}_k^{\text{new}} &= \frac{1}{N_k}\sum_{n=1}^N\gamma(z_{nk})(\bm{x}_n - \bm{\mu}_k^{\text{new}})(\bm{x}_n - \bm{\mu}_k^{\text{new}})^T \\
+\pi_k^{\text{new}} &= \frac{N_k}{N}.
+\end{align}
+This translates to the following procedure
+\begin{lstlisting}
+from numpy.core.umath_tests import matrix_multiply as mm
+
+def EM(X, K=4, max_iter=100, tol=0.01):
+    # Initialize variables
+    N, D = X.shape
+    pis = np.ones(K) / K
+    mus = np.random.uniform(-1, 1, size=(4, 4)) + X.mean(axis=0)
+    covs = np.ones((K, D, D)) * (4*np.random.rand(D) + 2) * np.eye(4)
+    
+    prev_llh = 0
+    for i in range(max_iter):
+        # E step
+        resps = np.zeros((K, N)) # responsibilities
+        for k in range(K):
+            resps[k] = pis[k] * multivariate_normal(mus[k], covs[k]).pdf(X)
+        resps /= resps.sum(axis=0)
+        
+        # M step
+        Nks = resps.sum(axis=1)[:, np.newaxis]
+        mus = np.dot(resps, X) / Nks # Calculate new mus
+        for k in range(K):
+            diff = X - mus[k]
+            sqdiff = mm(diff[:, :, np.newaxis], diff[:, np.newaxis, :])
+            covs[k] = (resps[k, :, np.newaxis, np.newaxis] * sqdiff).sum(axis=0)
+        covs /= Nks[:, np.newaxis]
+        pis = Nks / N
+        
+        # Evaluate log likelihood
+        llh = 0
+        for pi, mu, cov in zip(pis, mus, covs):
+            llh += pi*multivariate_normal(mu, cov).pdf(X)
+        llh = np.log(llh).sum()
+        print('Iteration: %d, likelihood %.4f' % (i, llh))
+        
+        if np.abs(llh - prev_llh) < tol:
+            # Break if the log-likelihood hasn't improved much
+            break
+        prev_llh = llh
+    
+    return pis, mus, covs 
+\end{lstlisting}
+The following method creates a scatter plot of $x_1$ and $x_2$. Each point is colored by the index of the weighted gaussian that is most likely. 
+\begin{lstlisting}
+def plot_components(X, mus, covs, pis):
+    N, K = X.shape[0], mus.shape[0]
+    # Evaluate the model
+    probs = np.zeros((K, N))
+    for k in range(K):
+        probs[k] = pis[k] * multivariate_normal(mus[k], covs[k]).pdf(X)
+    prediction = np.argmax(probs, axis=0)
+    
+    plt.figure()
+    colors = ['#E69F00', '#56B4E9', '#F0E442', '#009E73']
+    for k, color in zip(range(K), colors):
+        plt.scatter(X[prediction==k, 0], X[prediction==k, 1], c=color, label='C=%d'%k)
+
+    plt.legend()
+    plt.xlabel('$x_1$')
+    plt.xlabel('$x_2$')
+    plt.savefig('EM.png', dpi=300, bbox_layout='tight')
+    plt.show()
+\end{lstlisting}
+\item Using $K=2$, the algorithm converges after 26 iterations. Running the algorithm with a different random seed resulted in swapping the means and covariances of the two gaussians with minor perturbations. The components shown in \ref{fig:K2} show correlations of $\rho_{12}=-0.33$ $\rho_{12}=-0.05$ respectively. No positive correlation is found.
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{figures/EM_K2.png}
+\caption{Most probable components with $K=2$ after 26 iterations.}
+\label{fig:K2}
+\end{figure}
+\item Increasing the number of components to $K=3$, we find the components shown in Figure \ref{fig:K3}. At this point, the highest correlation is just 0.08, i.e. we still haven't found the cluster we are looking for.
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{figures/EM_K3.png}
+\caption{Most probable components with $K=3$ after 22 iterations.}
+\label{fig:K3}
+\end{figure}
+With $K=4$ components, the results are a lot more promising. Cluster 1 displayed in Figure \ref{fig:K4} has a correlation of 0.92. $21\%$ of the participants most likely belong to this cluster. This means that the rumour is very accurate (maybe even on the low side).
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{figures/EM_K4.png}
+\caption{Most probable components with $K=4$ after 55 iterations.}
+\label{fig:K4}
+\end{figure}
+\item Sample C likely belongs to component 1, which means that they have taken drug X. Finding the fraud is a bit harder: both subjects B and D have a very low likelihood ($2.3\times10^{-35}$ and $1.5\times10^{-33}$ respectively). Subject B most likely belongs to component 2, which has a strong negative correlation. Subject D belongs to the 4th component, which is way more sparse. My guess would be that subject B is the fraud, based on the likelihood of the sample.
+\end{enumerate}
+
+\pagebreak
+\section*{Exercise 4 -- Handwritten digit recognition}
+\end{document}
