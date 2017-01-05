@@ -254,8 +254,8 @@ def EM(X, K=4, max_iter=100, tol=0.01):
     # Initialize variables
     N, D = X.shape
     pis = np.ones(K) / K
-    mus = np.random.uniform(-1, 1, size=(4, 4)) + X.mean(axis=0)
-    covs = np.ones((K, D, D)) * (4*np.random.rand(D) + 2) * np.eye(4)
+    mus = np.random.uniform(-1, 1, size=(K, D)) + X.mean(axis=0)
+    covs = np.ones((K, D, D)) * (4*np.random.rand(D) + 2) * np.eye(D)
     
     prev_llh = 0
     for i in range(max_iter):
@@ -335,5 +335,136 @@ With $K=4$ components, the results are a lot more promising. Cluster 1 displayed
 \end{enumerate}
 
 \pagebreak
-\section*{Exercise 4 -- Handwritten digit recognition}
+\section*{Exercise 4 -- Handwritten digit recognition} %%%%%%%%%%%%%%%%
+\begin{enumerate}
+\item The following code loads the digits and plots a few of them. The result can be found in Figure \ref{fig:digits}.
+\begin{lstlisting}
+N, D = 800, 28*28
+with open('a012_images.dat', 'rb') as fid:
+    X = np.fromfile(fid, np.uint8).reshape(N, D)
+
+def plot_digit(X):
+    plt.imshow(X.reshape(28, 28).T, cmap=plt.cm.Greys)
+    plt.show()
+
+for i in np.random.choice(N, size=5):
+    plot_digit(X[i])
+\end{lstlisting}
+I think it should be fairly easy to classify the digits correctly. The digits in this dataset are very different from one another.
+\begin{figure}
+\centering
+\subfloat{\includegraphics[width=.3\linewidth]{figures/dig2.png}}
+\subfloat{\includegraphics[width=.3\linewidth]{figures/dig3.png}}
+\subfloat{\includegraphics[width=.3\linewidth]{figures/dig4.png}}
+\caption{An example of each digit in the dataset}
+\label{fig:digits}
+\end{figure}
+\item The bernoulli distribution is given by
+\begin{equation}
+p(\bm{x}|\bm{\mu}) = \prod_{i=1}^D\mu_i^{x_i}(1 - \mu_i)^{(1 - x_i)}.
+\end{equation}
+
+In the E step, we once again evaluate the responsibilities
+\begin{equation}
+\gamma(z_{nk}) = \frac{\pi_kp(\bm{x}_n|\bm{\mu}_k)}{\sum_{j=1}^K\pi_jp(\bm{x}_n|\bm{\mu}_j)}.
+\end{equation}
+
+In the M step, we compute the new means and mixing coefficients
+\begin{align}
+N_k &= \sum_{n=1}^N\gamma(z_{nk}) \\
+\bm{\mu}_k^{\text{new}} &=\frac{1}{N_k}\sum_{n=1}^N\gamma(z_{nk})\bm{x}_n \\
+\pi_k &= \frac{N_k}{N}.
+\end{align}
+
+Using a bernoulli mixture model instead of a gaussian mixture model is only requires a few straightforward changes to the code. None of the techniques for countering extremely small likelihoods described in the assignment were necessary.
+
+\begin{lstlisting}
+from numpy.core.umath_tests import matrix_multiply as mm
+
+def EM(X, K=4, max_iter=100, tol=0.01):
+    # Initialize variables
+    N, D = X.shape
+    pis = np.ones(K) / K
+    mus = np.random.uniform(0.25, 0.75, size=(K, D))
+    
+    prev_llh = 0
+    for i in range(max_iter):
+        # E step
+        resps = np.zeros((K, N)) # responsibilities
+        for k in range(K):
+            resps[k] = pis[k] * np.prod(mus[k]**X * (1-mus[k])**(1-X), axis=1)
+        resps /= resps.sum(axis=0)
+        
+        # M step
+        Nks = resps.sum(axis=1)[:, np.newaxis]
+        mus = np.dot(resps, X) / Nks # Calculate new mus
+        pis = Nks / N
+        
+        # Evaluate log likelihood
+        llh = 0
+        for k in range(K):
+            llh += pis[k] * np.prod(mus[k]**X * (1-mus[k])**(1-X), axis=1)
+        llh = np.log(llh).sum()
+        print('Iteration: %d, likelihood %.4f' % (i, llh))
+        
+        # Plot the means
+        _, axs = plt.subplots(1, K)
+        for mu, ax in zip(mus, axs):
+            ax.imshow(mu.reshape(28, 28).T, cmap=plt.cm.Greys, vmin=0, vmax=1)
+        plt.show()
+
+        if np.abs(llh - prev_llh) < tol:
+            # Break if the log-likelihood hasn't improved much
+            break
+        prev_llh = llh
+    
+    return pis, mus
+\end{lstlisting}
+
+\item Figure \ref{fig:means} shows the means after just 1 iteration and after 40 iterations. After 1 iteration, the left image already represents a 3. The other 2 images are a bit more vague. However, after 40 iterations they clearly resemble the other two digits in the dataset. The algorithm converges quite fast: after 10 iterations, hardly any improvement is made. Using a different random initializationm mainly effects the order and early shape of the components. After a few iterations, it doesn't make much of a difference.
+
+\begin{figure}
+\centering
+\includegraphics[width=.6\linewidth]{figures/means_init.png} \\
+\includegraphics[width=.6\linewidth]{figures/means.png}
+\caption{The means after 1 iteration (top) and after 40 iterations (bottom).}
+\label{fig:means}
+\end{figure}
+\item Figure \ref{fig:diff_means} shows the results using 2 and 4 components. With 2 components, the 2 and 4 have merged into one component, while the 3 is still quite clear. This is probably because the 2 and 4 are more similar. When using 4 components, the results vary a lot between runs. In the case shown here, the component representing a 2 has very high probabilities. Other runs did not show behaviour like this. Usually, there were components for each digit and a ``rest'' component with digits that looked a bit dissimilar to the others.
+\begin{figure}
+\centering
+\includegraphics[width=.6\linewidth]{figures/means2.png} \\
+\includegraphics[width=.6\linewidth]{figures/means4.png}
+\caption{The means using 2 components (top) and 4 components (bottom).}
+\label{fig:diff_means}
+\end{figure}
+
+Using 3 components, the model made 125 errors in total (3 for digit 2, 103 for digit 3, and 19 for digit 4. See Figure \ref{fig:missers}). The 2s and 4s that were missclassified all looked very atypical compared to the rest of the dataset. For the 3s however, a lot of the mistakes looked like ordinary 3s. The reason for this is probably that the 3 has more within-class variance.
+
+\begin{figure}
+\centering
+\subfloat[A 2 classified as a 4]{\includegraphics[width=.3\linewidth]{figures/miss2.png}}
+\subfloat[A 3 classified as a 4]{\includegraphics[width=.3\linewidth]{figures/miss3.png}}
+\subfloat[A 4 classified as a 2]{\includegraphics[width=.3\linewidth]{figures/miss4.png}}
+\caption{A few digits that were missclassified by the model.}
+\label{fig:missers}
+\end{figure}
+
+Lastly, we can initialize the means to the true values by taking the average image in each class. Now, the algorithm converges after only 4 iterations. The reason that 4 steps are still necessary is probably because of numerical issues.
+\begin{lstlisting}
+# Initialize with the true means
+mus = np.vstack((np.mean(X[Z==2], axis=0),
+                     np.mean(X[Z==3], axis=0),
+                     np.mean(X[Z==4], axis=0)))
+\end{lstlisting}
+
+\item I have drawn a 2 (Figure \ref{fig:mydigit}). The model correctly classifies this to be in the component initialized with the mean of all other 2s.
+
+\begin{figure}
+\centering
+\includegraphics[width=.3\linewidth]{figures/mydigit.png}
+\caption{A beautiful 2 drawn by myself}
+\label{fig:mydigit}
+\end{figure}
+\end{enumerate}
 \end{document}
