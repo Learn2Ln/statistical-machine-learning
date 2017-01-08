@@ -63,7 +63,102 @@
 
 \begin{document}
 \maketitle
-\section*{Exercise 1 -- Gaussian processes for regression}
+\section*{Exercise 1 -- Gaussian processes for regression} %%%%%%%%%%%%%%
+\begin{enumerate}
+\item The following code implements a vectorized implementation of the kernel. The entire dataset can be processed with a single call.
+
+\begin{lstlisting}
+def kernel(a, b, theta):
+    sqdist = np.sum(a**2, axis=1) + np.sum(b**2, axis=1) - 2*np.dot(a, b.T)
+    return theta[0]*np.exp(-theta[1]/2 * sqdist) + theta[2] + theta[3]*a.dot(b.T)
+\end{lstlisting}
+
+\item The following code creates a column vector $\bm{X}$ of $N=101$ equally spaced points between $-1$ and $1$ (inclusive). It then computes the Gram matrix $\bm{K}(\bm{X}, \bm{X})$ with parameter vector $\bm{\theta}=[1, 1, 1, 1]$.
+\begin{lstlisting}
+N = 101
+theta = np.ones(4)
+X = np.linspace(-1, 1, N).reshape(N, 1)
+K = kernel(X, X, theta)
+\end{lstlisting}
+\item $\bm{K}$ is an $N \times N$ matrix with $\bm{K}_{ij} = k(\bm{X}_i, \bm{X}_j)$. We can show that $\bm{K}$ is positive semidefinite by showing that all eigenvalues are larger or equal to zero. Because of numerical issues, we have a small tolerance. It turns out that the smallest eigenvalue is in fact $-1.5\times10^{-14}$.
+\begin{lstlisting}
+def is_psd(A, tol=1e-8):
+    eigen, _ = np.linalg.eigh(A)
+    return np.all(E > -tol)
+
+is_psd(K) # -> True
+\end{lstlisting}
+Additionally, $k$ can be shown to be a valid kernel using equations 6.13-6.22 from Bishop.
+
+\item We can use the Gram matrix $\bm{K}(\bm{X}, \bm{X})$ to sample functions from the Gaussian process prior $\bm{y}(\bm{X}) \sim \mathcal{N}(\bm{0}, \bm{K}(\bm{X}, \bm{X}))$. See Figure \ref{fig:sampled_f}.
+
+\begin{lstlisting}
+mu = np.zeros(N)
+for _ in range(5):
+    plt.plot(np.random.multivariate_normal(mu, K))
+plt.show()
+\end{lstlisting}
+
+\begin{figure}
+\centering
+\includegraphics[width=.5\linewidth]{figures/sampled_f.png}
+\caption{5 functions sampled from the Gaussian process prior.}
+\label{fig:sampled_f}
+\end{figure}
+
+\item Figure \ref{fig:sample_thetas} shows functions sampled using different settings of $\theta$.
+
+\textbf{Bonus}: $\theta_0$ influences the overall scale of the function. The higher $\theta_0$, the higher the absolute range of the function. For example, the functions in the second plot have a much higher range than in most other plots.\\
+A small $\theta_1$ makes the function very smooth (e.g., plot 4), while a high $\theta_1$ makes the function more jagged (e.g., plot 3). \\
+$\theta_2$ once again controls the range of the function (e.g., plot 5). \\
+$\theta_3$ influences both the smoothness and the range of the function, since it controls the weight of the dot-product of the inputs.
+
+\begin{figure}
+\centering
+\includegraphics[width=.8\linewidth]{figures/sample_thetas.png}
+\caption{5 functions sampled from the Gaussian process prior using different kernel parameters.}
+\label{fig:sample_thetas}
+\end{figure}
+
+
+\item 
+We first compute the Gram matrix
+\begin{equation*}
+\bm{K} = 
+\begin{pmatrix}
+2.25 & 1.68 & 1.58 & 1.97 \\
+1.68 & 2.04 & 2.06 & 1.94 \\
+1.58 & 2.06 & 2.09 & 1.89 \\
+1.97 & 1.94 & 1.89 & 2.01
+\end{pmatrix}.
+\end{equation*}
+Next, we can compute the covariance matrix $\bm{C}$ corresponding to the marginal distribution of the training target values $p(\bm{t}) = \mathcal{N}(\bm{t}|\bm{0}, \bm{C})$
+
+\begin{align}
+C(\bm{x}_n, \bm{x}_m) &= k(\bm{x}_n, \bm{x}_m) + \beta^{-1}\delta_{nm} \\
+\bm{C} &= \bm{K} + \beta^{-1}\bm{I} \\
+\bm{C} &= 
+\begin{pmatrix}
+3.25 & 1.68 & 1.58 & 1.97 \\
+1.68 & 3.04 & 2.06 & 1.94 \\
+1.58 & 2.06 & 3.09 & 1.89 \\
+1.97 & 1.94 & 1.89 & 3.01 \nonumber
+\end{pmatrix}.
+\end{align}
+
+
+\item To compute the mean and standard deviation of $p(t|\bm{t})$ for $x=0$, we need equations 6.65, 6.66 and 6.67 from Bishop.
+\begin{align}
+\bm{C}_{N+1} &= \begin{pmatrix}\bm{C}_N & \bm{k} \\ \bm{k}^T & c\end{pmatrix} \\
+m(\bm{x}_{N+1}) &= \bm{k}^T\bm{C}_N^{-1}\bm{t}=-0.25 \\
+\sigma^2(\bm{x}_{N+1}) &= c - \bm{k}^T\bm{C}_N^{-1}\bm{k}=0.23
+\end{align}
+
+
+\item The mean of the conditional distribution $p(t|\bm{t})$ does not go to zero in the limit $x \rightarrow \pm\infty$. This is because $k$ is a function of $x$ and has a constant term. If we set $\theta_2 = \theta_3 = 0$, the mean does in fact go to zero.
+
+\end{enumerate}
+
 
 \pagebreak
 \section*{Exercise 2 -- Neural network regression} %%%%%%%%%%%%%%%%%%%%%%
@@ -207,7 +302,7 @@ def plot_density(X, Y):
 
 \item The output from the network is quite similar to the original distribution. The major missing feature is the \emph{``peak''} in the original distribution. This peak is probably not smooth enough for the network to represent.
 
-The network may converge faster if the root mean squared error is used instead of simply the sum of squares. The loss will be less noisy, because it is averaged over multiple training examples. To increase the performance, it may be beneficial to use a deeper, but more narrow network. I.e., increase the number of layers, but decrease the number of units per layer. This will increase the expressive power of the network. Lastly, the performance of the network can be increased by using more data. In this case, this can simply be achieved by increasing the number of samples taken from the original distribution.
+The network may converge faster if the root mean squared error is used instead of simply the sum of squares. The loss will be less noisy, because it is averaged over multiple training examples. To increase the performance, it may be beneficial to use a deeper, but more narrow network. I.e., increase the number of layers, but decrease the number of units per layer. This will increase the expressive power of the network, while requiring less hidden units than a 2 layer MLP. Lastly, the performance of the network can be increased by using more data. In this case, this can simply be achieved by increasing the number of samples taken from the original distribution.
 \end{enumerate}
 
 
@@ -231,7 +326,7 @@ sns.pairplot(df)
 \begin{figure}[H]
 \centering
 \includegraphics[width=.8\linewidth]{figures/scatter.png}
-\caption{Scatter plot of $x_1$ and $x_2$. The points are coloured according to $x_3 + x_4$. The red ellipses indicate points which are positively correlated between $x_1$ and $x_2$, and also show some structure in $x_3 + x_4$. These could be possible cases of doping. Other simple combinations of $x_3$ and $x_4$ did not show interactions like here.}
+\caption{Scatter plot of $x_1$ and $x_2$. The points are coloured according to $x_3 + x_4$. The red ellipses indicate points which are positively correlated between $x_1$ and $x_2$, and also show some structure in $x_3 + x_4$. The bottom circle contains very few points ($\ll20\%$), so I think the top circle is more likely to be caused by subject X. These could be possible cases of doping. Other simple combinations of $x_3$ and $x_4$ did not show interactions like here.}
 \label{fig:scatter}
 \end{figure}
 \item 
@@ -248,6 +343,8 @@ N_k &= \sum_{n=1}^N\gamma(z_{nk}) \\
 \end{align}
 This translates to the following procedure
 \begin{lstlisting}
+# This function does proper broadcasting, which is
+# very useful when computing the covariances
 from numpy.core.umath_tests import matrix_multiply as mm
 
 def EM(X, K=4, max_iter=100, tol=0.01):
@@ -373,7 +470,7 @@ In the M step, we compute the new means and mixing coefficients
 \begin{align}
 N_k &= \sum_{n=1}^N\gamma(z_{nk}) \\
 \bm{\mu}_k^{\text{new}} &=\frac{1}{N_k}\sum_{n=1}^N\gamma(z_{nk})\bm{x}_n \\
-\pi_k &= \frac{N_k}{N}.
+\pi_k^{\text{new}} &= \frac{N_k}{N}.
 \end{align}
 
 Using a bernoulli mixture model instead of a gaussian mixture model is only requires a few straightforward changes to the code. None of the techniques for countering extremely small likelihoods described in the assignment were necessary.
