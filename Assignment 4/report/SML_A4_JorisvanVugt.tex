@@ -473,7 +473,7 @@ N_k &= \sum_{n=1}^N\gamma(z_{nk}) \\
 \pi_k^{\text{new}} &= \frac{N_k}{N}.
 \end{align}
 
-Using a bernoulli mixture model instead of a gaussian mixture model is only requires a few straightforward changes to the code. None of the techniques for countering extremely small likelihoods described in the assignment were necessary.
+Using a bernoulli mixture model instead of a gaussian mixture model only requires a few straightforward changes to the code. None of the techniques for countering extremely small likelihoods described in the assignment were necessary.
 
 \begin{lstlisting}
 from numpy.core.umath_tests import matrix_multiply as mm
@@ -518,7 +518,7 @@ def EM(X, K=4, max_iter=100, tol=0.01):
     return pis, mus
 \end{lstlisting}
 
-\item Figure \ref{fig:means} shows the means after just 1 iteration and after 40 iterations. After 1 iteration, the left image already represents a 3. The other 2 images are a bit more vague. However, after 40 iterations they clearly resemble the other two digits in the dataset. The algorithm converges quite fast: after 10 iterations, hardly any improvement is made. Using a different random initializationm mainly effects the order and early shape of the components. After a few iterations, it doesn't make much of a difference.
+\item Figure \ref{fig:means} shows the means after just 1 iteration and after 40 iterations. After 1 iteration, the left image already represents a 3. The other 2 images are a bit more vague. However, after 40 iterations they clearly resemble the other two digits in the dataset. The algorithm converges quite fast: after 10 iterations, hardly any improvement is made. Using a different random initialization mainly effects the order and early shape of the components. After a few iterations, it doesn't make much of a difference.
 
 \begin{figure}
 \centering
